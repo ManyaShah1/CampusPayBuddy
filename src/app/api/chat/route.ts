@@ -1,15 +1,28 @@
 import { NextResponse } from 'next/server';
 
+function formatPrivateKey(rawKey: string): string {
+  // Strip surrounding quotes if present
+  let key = rawKey.trim();
+  if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
+    key = key.slice(1, -1);
+  }
+  // Replace escaped \n with actual newlines
+  if (key.includes('\\n')) {
+    key = key.replace(/\\n/g, '\n');
+  }
+  return key;
+}
+
 function getDialogflowCredentials(): { projectId: string; clientEmail: string; privateKey: string } | null {
   const projectId = process.env.DIALOGFLOW_PROJECT_ID;
   const clientEmail = process.env.DIALOGFLOW_CLIENT_EMAIL;
-  const privateKey = process.env.DIALOGFLOW_PRIVATE_KEY;
+  const rawKey = process.env.DIALOGFLOW_PRIVATE_KEY;
 
-  if (projectId && clientEmail && privateKey) {
+  if (projectId && clientEmail && rawKey) {
     return {
-      projectId,
-      clientEmail,
-      privateKey: privateKey.replace(/\\n/g, '\n'),
+      projectId: projectId.trim(),
+      clientEmail: clientEmail.trim(),
+      privateKey: formatPrivateKey(rawKey),
     };
   }
 
@@ -29,7 +42,7 @@ export async function POST(req: Request) {
     if (!creds) {
       return NextResponse.json(
         {
-          reply: 'Dialogflow credentials missing. Please check DIALOGFLOW_PROJECT_ID, DIALOGFLOW_CLIENT_EMAIL, and DIALOGFLOW_PRIVATE_KEY in .env.local or Vercel.',
+          reply: 'Dialogflow credentials missing in environment variables. Set DIALOGFLOW_PROJECT_ID, DIALOGFLOW_CLIENT_EMAIL, and DIALOGFLOW_PRIVATE_KEY in Vercel settings.',
           source: 'missing-credentials',
         },
         { status: 400 }
@@ -70,7 +83,7 @@ export async function POST(req: Request) {
       projectId: creds.projectId,
     });
   } catch (error: any) {
-    console.error('Dialogflow API Error:', error);
+    console.error('Dialogflow API Error on Vercel:', error);
     return NextResponse.json(
       {
         reply: `Error communicating with Dialogflow agent: ${error.message}`,
